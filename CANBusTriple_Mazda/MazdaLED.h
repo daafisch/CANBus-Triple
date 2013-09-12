@@ -2,6 +2,7 @@
 #include "Middleware.h"
 
 
+
 class MazdaLED : 
 Middleware
 {
@@ -47,11 +48,12 @@ char MazdaLED::lcdStockString[13] = "            ";
 char MazdaLED::lcdStatusString[13] = "            ";
 char MazdaLED::gaugePage = 0;
 
-int boost, boostWhole, boostRemainder;
-int afr, afrWhole, afrRemainder;
-int krd, krdWhole, krdRemainder;
-int bat;
-int fp;
+int boost, boostWhole, boostRemainder = 0;
+int afr, afrWhole, afrRemainder = 0;
+int krd, krdWhole, krdRemainder = 0;
+int krdMax, krdMaxWhole, krdMaxRemainder = 0;
+int bat = 0;
+int fp = 0;
 
 unsigned long MazdaLED::animationCounter = 0;
 unsigned long MazdaLED::stockOverrideTimer = 4000;
@@ -82,11 +84,11 @@ void MazdaLED::tick()
   //if( (millis() % 100) < 1 ) MazdaLED::egtServiceCall();
   // if( (millis() % 100) < 1 ) MazdaLED::advanceServiceCall();
 
-  if( (millis() % 97) < 1 ) MazdaLED::knockServiceCall();  
-  if( (millis() % 100) < 1 ) MazdaLED::afrServiceCall();
-  if( (millis() % 103) < 1 ) MazdaLED::boostServiceCall();
-  if( (millis() % 106) < 1 ) MazdaLED::batServiceCall();
-  if( (millis() % 109) < 1 ) MazdaLED::fpServiceCall();
+  if( (millis() % 100) < 1 ) MazdaLED::knockServiceCall();  
+  if( (millis() % 203) < 1 ) MazdaLED::afrServiceCall();
+  if( (millis() % 206) < 1 ) MazdaLED::boostServiceCall();
+  if( (millis() % 503) < 1 ) MazdaLED::batServiceCall();
+  if( (millis() % 209) < 1 ) MazdaLED::fpServiceCall();
 
 
 }
@@ -436,6 +438,12 @@ Message MazdaLED::process(Message msg)
         krd = ((msg.frame_data[4]*256)+msg.frame_data[5])/5;
         krdWhole = krd / 100;
         krdRemainder = krd % 100;  
+        if(krd > krdMax)
+        {
+          krdMax = krd;
+          krdMaxWhole = krdMax / 100;
+          krdMaxRemainder = krdMax % 100;
+        }
       }
       else if(msg.frame_data[2] == 0xF4 && msg.frame_data[3] == 0x23) //FP in PSI 
       {
@@ -455,19 +463,16 @@ Message MazdaLED::process(Message msg)
   // sprintf(lcdString, "A:%d.%d K:%d", afrWhole, afrRemainder, knockRetard );
   switch(MazdaLED::gaugePage)
   {
-    case 0:
-      sprintf(lcdString, "B%3d.%d A%2d.%d", boostWhole, boostRemainder, afrWhole, afrRemainder );
-      break;
-    case 1:
-      sprintf(lcdString, "F%4d B%3d", fp, bat );
-      break;
-    case 2:
-      sprintf(lcdString, "KR %2d.%d", krdWhole, krdRemainder );
-      break;
+  case 0:
+    sprintf(lcdString, "B%3d.%d A%2d.%d", boostWhole, boostRemainder, afrWhole, afrRemainder );
+    break;
+  case 1:
+    sprintf(lcdString,  "F%4d B%3d  ", fp, bat );
+    break;
+  case 2:
+    sprintf(lcdString,  "KR%2d.%d %2d.%d", krdWhole, krdRemainder, krdMaxWhole, krdMaxRemainder );
+    break;
   }
-  
-  // sprintf(lcdString, "A:%d.%d K:%d", afrWhole, afrRemainder, sparkAdvance );
-  // sprintf(lcdString, "A:%d.%d W:%d", afrWhole, afrRemainder, pWeight );
 
 
   // Turn off extras like decimal point. Needs verification!
@@ -483,6 +488,7 @@ Message MazdaLED::process(Message msg)
 
   return msg;
 }
+
 
 
 
