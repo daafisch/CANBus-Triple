@@ -8,6 +8,7 @@
 #include <CANBus.h>
 #include <Message.h>
 #include <QueueArray.h>
+#include <EEPROM.h>
 
 #include "WheelButton.h"
 #include "ChannelSwap.h"
@@ -41,8 +42,13 @@ CANBus SerialCommand::busses[3] = { CANBus1, CANBus2, CANBus3 }; // Maybe do thi
 byte wheelButton = 0;
 boolean debug = false;
 
+char mazdaLcdMenu[][13] = {//0123456789AB
+                            "NATOR NY    ",
+                            "MIKEZ IS GAY",
+                            "MSF.ORG     ",
+                            "CAN BUS 3   "};
 
-
+int i=0;
 void setup(){
   
   Serial.begin( 115200 );
@@ -59,7 +65,6 @@ void setup(){
   digitalWrite( BOOT_LED, HIGH );
   delay(100);
   digitalWrite( BOOT_LED, LOW );
-  delay(100);
   
   
   // Setup CAN Busses 
@@ -73,6 +78,7 @@ void setup(){
   CANBus2.baudConfig(500);
   // CANBus2.setRxInt(true);
   CANBus2.setMode(NORMAL);
+
   // attachInterrupt(CAN2INT, handleInterrupt1, LOW);
   
   CANBus3.begin();
@@ -86,7 +92,9 @@ void setup(){
   
   // Middleware setup
   MazdaLED::init( &messageQueue );
+  SerialCommand::logOutputFilter = 0x7DF;
   SerialCommand::init( &messageQueue, busses, 0 );
+
   
 }
 
@@ -98,20 +106,41 @@ void handleInterrupt1(){}
 void loop() {
   
  byte button = WheelButton::getButtonDown();
+ 
  if( wheelButton != button ){
    wheelButton = button;
    
    switch(wheelButton){
-     case B10000000:
+     case B_ARROW_LEFT:
        MazdaLED::showStatusMessage("LEFT        ", 2000);
      break;
+     case B_ARROW_RIGHT:
+       MazdaLED::showStatusMessage("RIGHT       ", 2000);
+     break;
+     case (B_ARROW_RIGHT + B_ARROW_LEFT):
+       MazdaLED::showStatusMessage("RIGHT LEFT  ", 2000);
+     break;
+     case B_ARROW_DOWN:
+       MazdaLED::gaugePage++;
+     break;
+     case B_ARROW_UP:
+       MazdaLED::gaugePage--;
+     break;
      case B1000010:
-       MazdaLED::showStatusMessage("BACK RIGHT  ", 2000);
+       MazdaLED::enabled = !MazdaLED::enabled;
+       EEPROM.write(0, MazdaLED::enabled); // For testing, proper settings in EEPROM TBD
+       if(MazdaLED::enabled)
+         MazdaLED::showStatusMessage("MazdaLED ON ", 2000);
+         else
+         MazdaLED::showStatusMessage("MazdaLED OFF", 2000);
      break;
    }
  
  }
- 
+  if( MazdaLED::gaugePage<0)
+    MazdaLED::gaugePage=2;
+ else if( MazdaLED::gaugePage>2)
+    MazdaLED::gaugePage=0;
   // All Middleware ticks (Like loop() for middleware)
   MazdaLED::tick();
   SerialCommand::tick();
@@ -133,6 +162,7 @@ void loop() {
     Message msg = messageQueue.pop();
     CANBus channel = busses[msg.busId-1];
     
+    //SerialCommand::printMessageToSerial(msg);
     success = sendMessage( msg, channel );
     
     if( !success ){
@@ -252,11 +282,6 @@ void processMessage( Message msg ){
   msg = SerialCommand::process( msg );
   msg = MazdaLED::process( msg );
   msg = ChannelSwap::process( msg );
-  
-  // Break this into a middleware implementation
-  if( msg.frame_id == 0x201 ){
-    msg.dispatch = false;
-  }
   
   if( msg.dispatch == true ){
     messageQueue.push( msg );

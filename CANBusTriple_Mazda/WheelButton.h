@@ -15,7 +15,17 @@ int infoButtonIn = A1;
 #define INFO_BUTTON_BACK 2
 #define INFO_BUTTON_INFO 3
 
-
+//Button codes
+#define B_ARROW_NONE   B00000000
+#define B_ARROW_LEFT   B10000000
+#define B_ARROW_RIGHT  B01000000
+#define B_ARROW_UP     B00100000
+#define B_ARROW_DOWN   B00010000
+#define B_ARROW_ENTER  B00001000
+#define B_INFO_NONE    B00000000
+#define B_INFO_NAV     B00000100
+#define B_INFO_BACK    B00000010
+#define B_INFO_INFO    B00000001
 
 /*
 *  Returns a byte indicating wheel buttons that are down
@@ -82,5 +92,6 @@ byte WheelButton::getButtonDown(){
   
   return out;
 }
+
 
 

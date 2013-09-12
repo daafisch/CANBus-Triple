@@ -2,49 +2,56 @@
 #include "Middleware.h"
 
 
-class MazdaLED : Middleware
+class MazdaLED : 
+Middleware
 {
-  
-  private:
-    static QueueArray<Message>* mainQueue;
-    static unsigned long updateCounter;
-    static void pushNewMessage();
-    static int fastUpdateDelay;
-  public:
-    static void init( QueueArray<Message> *q );
-    static void tick();
-    static void showStatusMessage(char* str, int time);
-    static char lcdString[13];
-    static char lcdStockString[13];
-    static char lcdStatusString[13];
-    static unsigned long stockOverrideTimer;
-    static unsigned long statusOverrideTimer;
-    static void setOverrideTime( int n );
-    static void setStatusTime( int n );
-    static unsigned long animationCounter;
-    static Message process( Message msg );
-    static char* currentLcdString();
-    static void knockServiceCall();
-    static void egtServiceCall();
-    static void advanceServiceCall();
-    static void pWeightServiceCall();
-    
+
+private:
+  static QueueArray<Message>* mainQueue;
+  static unsigned long updateCounter;
+  static void pushNewMessage();
+  static int fastUpdateDelay;
+public:
+  static void init( QueueArray<Message> *q );
+  static void tick();
+  static boolean enabled;
+  static void showStatusMessage(char* str, int time);
+  static char lcdString[13];
+  static char lcdStockString[13];
+  static char lcdStatusString[13];
+  static char gaugePage;
+  static unsigned long stockOverrideTimer;
+  static unsigned long statusOverrideTimer;
+  static void setOverrideTime( int n );
+  static void setStatusTime( int n );
+  static unsigned long animationCounter;
+  static Message process( Message msg );
+  static char* currentLcdString();
+  static void knockServiceCall();
+  static void egtServiceCall();
+  static void afrServiceCall();
+  static void boostServiceCall();
+  static void batServiceCall();
+  static void fpServiceCall();
+  static void advanceServiceCall();
+
+
 };
 
+boolean MazdaLED::enabled = EEPROM.read(0);
 unsigned long MazdaLED::updateCounter = 0;
 int MazdaLED::fastUpdateDelay = 500;
 QueueArray<Message>* MazdaLED::mainQueue;
 char MazdaLED::lcdString[13] = "CANBusTriple";
 char MazdaLED::lcdStockString[13] = "            ";
 char MazdaLED::lcdStatusString[13] = "            ";
+char MazdaLED::gaugePage = 0;
 
-int afr;
-int afrWhole;
-int afrRemainder;
-int knockRetard;
-int egt;
-int sparkAdvance;
-int pWeight;
+int boost, boostWhole, boostRemainder;
+int afr, afrWhole, afrRemainder;
+int krd, krdWhole, krdRemainder;
+int bat;
+int fp;
 
 unsigned long MazdaLED::animationCounter = 0;
 unsigned long MazdaLED::stockOverrideTimer = 4000;
@@ -61,19 +68,27 @@ void MazdaLED::init( QueueArray<Message> *q )
 
 void MazdaLED::tick()
 {
+  if(!enabled) return;
+
   // New LED update CAN message for fast updates
   // check stockOverrideTimer, no need to do fast updates while stock override is active
   if( (updateCounter+fastUpdateDelay) < millis() && stockOverrideTimer < millis() ){
     pushNewMessage();
     updateCounter = millis();
   }
-  
+
   // Send knock retard query
   // if( (millis() % 100) < 1 ) MazdaLED::knockServiceCall();
-  if( (millis() % 100) < 1 ) MazdaLED::egtServiceCall();
+  //if( (millis() % 100) < 1 ) MazdaLED::egtServiceCall();
   // if( (millis() % 100) < 1 ) MazdaLED::advanceServiceCall();
-  // if( (millis() % 100) < 1 ) MazdaLED::pWeightServiceCall();
-  
+
+  if( (millis() % 97) < 1 ) MazdaLED::knockServiceCall();  
+  if( (millis() % 100) < 1 ) MazdaLED::afrServiceCall();
+  if( (millis() % 103) < 1 ) MazdaLED::boostServiceCall();
+  if( (millis() % 106) < 1 ) MazdaLED::batServiceCall();
+  if( (millis() % 109) < 1 ) MazdaLED::fpServiceCall();
+
+
 }
 
 
@@ -84,16 +99,16 @@ void MazdaLED::showStatusMessage(char* str, int time){
 
 
 void MazdaLED::knockServiceCall(){
-  
+
   // NOT WORKING
-  
+
   Message msg;
   msg.busId = 2;
   msg.frame_id = 0x7E0;     // 02 01 0D 00 00 00 00 00
   msg.frame_data[0] = 0x03;
   msg.frame_data[1] = 0x22;
-  msg.frame_data[2] = 0x17;
-  msg.frame_data[3] = 0x46;
+  msg.frame_data[2] = 0x03;
+  msg.frame_data[3] = 0xEC;
   msg.frame_data[4] = 0x00;
   msg.frame_data[5] = 0x00;
   msg.frame_data[6] = 0x00;
@@ -101,11 +116,11 @@ void MazdaLED::knockServiceCall(){
   msg.length = 8;
   msg.dispatch = true;
   mainQueue->push(msg);
-  
+
 }
 
 void MazdaLED::advanceServiceCall(){
-  
+
   Message msg;
   msg.busId = 2;
   msg.frame_id = 0x7E0;     // 02 01 0D 00 00 00 00 00
@@ -120,11 +135,11 @@ void MazdaLED::advanceServiceCall(){
   msg.length = 8;
   msg.dispatch = true;
   mainQueue->push(msg);
-  
+
 }
 
 void MazdaLED::egtServiceCall(){
-  
+
   Message msg;
   msg.busId = 2;
   msg.frame_id = 0x7E0;
@@ -139,18 +154,18 @@ void MazdaLED::egtServiceCall(){
   msg.length = 8;
   msg.dispatch = true;
   mainQueue->push(msg);
-  
+
 }
 
-void MazdaLED::pWeightServiceCall(){
-  
+void MazdaLED::afrServiceCall(){
+
   Message msg;
   msg.busId = 2;
-  msg.frame_id = 0x737;
+  msg.frame_id = 0x7E0;
   msg.frame_data[0] = 0x03;
   msg.frame_data[1] = 0x22;
-  msg.frame_data[2] = 0x59;
-  msg.frame_data[3] = 0x6A;
+  msg.frame_data[2] = 0xDA;
+  msg.frame_data[3] = 0x85;
   msg.frame_data[4] = 0x00;
   msg.frame_data[5] = 0x00;
   msg.frame_data[6] = 0x00;
@@ -158,16 +173,67 @@ void MazdaLED::pWeightServiceCall(){
   msg.length = 8;
   msg.dispatch = true;
   mainQueue->push(msg);
-  
+}
+
+void MazdaLED::boostServiceCall(){
+
+  Message msg;
+  msg.busId = 2;
+  msg.frame_id = 0x7E0;
+  msg.frame_data[0] = 0x02;
+  msg.frame_data[1] = 0x01;
+  msg.frame_data[2] = 0x0B;
+  msg.frame_data[3] = 0x00;
+  msg.frame_data[4] = 0x00;
+  msg.frame_data[5] = 0x00;
+  msg.frame_data[6] = 0x00;
+  msg.frame_data[7] = 0x00;
+  msg.length = 8;
+  msg.dispatch = true;
+  mainQueue->push(msg);
+}
+
+void MazdaLED::batServiceCall(){
+
+  Message msg;
+  msg.busId = 2;
+  msg.frame_id = 0x7E0;
+  msg.frame_data[0] = 0x03;
+  msg.frame_data[1] = 0x22;
+  msg.frame_data[2] = 0x03;
+  msg.frame_data[3] = 0xCA;
+  msg.frame_data[4] = 0x00;
+  msg.frame_data[5] = 0x00;
+  msg.frame_data[6] = 0x00;
+  msg.frame_data[7] = 0x00;
+  msg.length = 8;
+  msg.dispatch = true;
+  mainQueue->push(msg);
+}
+
+void MazdaLED::fpServiceCall(){
+
+  Message msg;
+  msg.busId = 2;
+  msg.frame_id = 0x7E0;
+  msg.frame_data[0] = 0x03;
+  msg.frame_data[1] = 0x22;
+  msg.frame_data[2] = 0xF4;
+  msg.frame_data[3] = 0x23;
+  msg.frame_data[4] = 0x00;
+  msg.frame_data[5] = 0x00;
+  msg.frame_data[6] = 0x00;
+  msg.frame_data[7] = 0x00;
+  msg.length = 8;
+  msg.dispatch = true;
+  mainQueue->push(msg);
 }
 
 
-
-
 void MazdaLED::pushNewMessage(){
-  
+
   char* lcd = currentLcdString();
-    
+
   Message msg;
   msg.busId = 3;
   msg.frame_id = 0x290;
@@ -182,7 +248,7 @@ void MazdaLED::pushNewMessage(){
   msg.length = 8;
   msg.dispatch = true;
   mainQueue->push(msg);
-  
+
   Message msg2;
   msg2.busId = 3;
   msg2.frame_id = 0x291;
@@ -195,7 +261,7 @@ void MazdaLED::pushNewMessage(){
   msg2.length = 8;
   msg2.dispatch = true;
   mainQueue->push(msg2);
-  
+
   // Turn off extras and periods on screen
   // 02 03 02 8F C0 00 00 00 01 27 10 40 08
 
@@ -213,8 +279,8 @@ void MazdaLED::pushNewMessage(){
   msg3.length = 8;
   msg3.dispatch = true;
   mainQueue->push(msg3);
-  
-  
+
+
 }
 
 
@@ -239,7 +305,8 @@ void MazdaLED::setStatusTime( int n ){
 
 Message MazdaLED::process(Message msg)
 {
-  
+  if(!enabled) return msg;
+
   if( msg.frame_id == 0x28F && stockOverrideTimer < millis() ){
     // Block extras
     msg.frame_data[0] = 0xC0;
@@ -252,34 +319,34 @@ Message MazdaLED::process(Message msg)
     // msg.frame_data[7] = 0x40; looks like music note light
     msg.dispatch = true;
   }
-  
+
   if( msg.frame_id == 0x290 ){
-    
+
     if( msg.frame_data[1] != lcdStockString[0] ||
-        msg.frame_data[2] != lcdStockString[1] || 
-        msg.frame_data[3] != lcdStockString[2] || 
-        msg.frame_data[4] != lcdStockString[3] || 
-        msg.frame_data[5] != lcdStockString[4] || 
-        msg.frame_data[6] != lcdStockString[5] || 
-        msg.frame_data[7] != lcdStockString[6] ){
-          
-        lcdStockString[0] = msg.frame_data[1];
-        lcdStockString[1] = msg.frame_data[2];
-        lcdStockString[2] = msg.frame_data[3];
-        lcdStockString[3] = msg.frame_data[4];
-        lcdStockString[4] = msg.frame_data[5];
-        lcdStockString[5] = msg.frame_data[6];
-        lcdStockString[6] = msg.frame_data[7];
-        
-        /*
+      msg.frame_data[2] != lcdStockString[1] || 
+      msg.frame_data[3] != lcdStockString[2] || 
+      msg.frame_data[4] != lcdStockString[3] || 
+      msg.frame_data[5] != lcdStockString[4] || 
+      msg.frame_data[6] != lcdStockString[5] || 
+      msg.frame_data[7] != lcdStockString[6] ){
+
+      lcdStockString[0] = msg.frame_data[1];
+      lcdStockString[1] = msg.frame_data[2];
+      lcdStockString[2] = msg.frame_data[3];
+      lcdStockString[3] = msg.frame_data[4];
+      lcdStockString[4] = msg.frame_data[5];
+      lcdStockString[5] = msg.frame_data[6];
+      lcdStockString[6] = msg.frame_data[7];
+
+      /*
         Serial.print( "lcdStockString: ");
-        Serial.println( lcdStockString );
-        */
-      
+       Serial.println( lcdStockString );
+       */
+
     }
-    
+
     char* lcd = currentLcdString();
-    
+
     msg.frame_data[1] = lcd[0];
     msg.frame_data[2] = lcd[1];
     msg.frame_data[3] = lcd[2];
@@ -288,87 +355,136 @@ Message MazdaLED::process(Message msg)
     msg.frame_data[6] = lcd[5];
     msg.frame_data[7] = lcd[6];
     msg.dispatch = true;
-    
+
   }
-  
+
   if( msg.frame_id == 0x291 ){
-    
+
     if( msg.frame_data[1] != lcdStockString[7] ||
-        msg.frame_data[2] != lcdStockString[8] || 
-        msg.frame_data[3] != lcdStockString[9] || 
-        msg.frame_data[4] != lcdStockString[10] || 
-        msg.frame_data[5] != lcdStockString[11] ){
-      
+      msg.frame_data[2] != lcdStockString[8] || 
+      msg.frame_data[3] != lcdStockString[9] || 
+      msg.frame_data[4] != lcdStockString[10] || 
+      msg.frame_data[5] != lcdStockString[11] ){
+
       lcdStockString[7] = msg.frame_data[1];
       lcdStockString[8] = msg.frame_data[2];
       lcdStockString[9] = msg.frame_data[3];
       lcdStockString[10] = msg.frame_data[4];
       lcdStockString[11] = msg.frame_data[5];
-      
+
       setOverrideTime(1500);
-      
+
     }
-    
+
     char* lcd = currentLcdString();
-    
+
     msg.frame_data[1] = lcd[7];
     msg.frame_data[2] = lcd[8];
     msg.frame_data[3] = lcd[9];
     msg.frame_data[4] = lcd[10];
     msg.frame_data[5] = lcd[11];
     msg.dispatch = true;
-    
+
   }
-  
-  // Test crap for AFR
-  /*
-  if( msg.frame_id == 0x200 ){
-    int afr;
-    afr = ((((msg.frame_data[2]-38)*256)+msg.frame_data[3])-0)/16;
+
+
+
+
+  /*if( msg.frame_id == 0x7E8  ){
+   knockRetard = (msg.frame_data[3]*7)/2;
+   }
+   
+   if( msg.frame_id == 0x7E8 && msg.frame_data[2] == 0x3C ){
+   egt = (( msg.frame_data[3] *256)+ msg.frame_data[4] )/10 - 40;
+   }
+   
+   if( msg.frame_id == 0x7E8 && msg.frame_data[2] == 0x11 && msg.frame_data[3] == 0x6B ){
+   sparkAdvance = (msg.frame_data[5]*0x0A)/4;
+   // sparkAdvance = msg.frame_data[5];
+   }
+   
+   if( msg.frame_id == 0x73F && msg.frame_data[2] == 0x59 && msg.frame_data[3] == 0x6A ){
+   pWeight = (((msg.frame_data[4]*256) + msg.frame_data[5]) * 0xB)/0x64 ;
+   }*/
+
+  if(msg.frame_id == 0x7E8 || msg.frame_id == 0x7E0)
+  {
+    //Serial.println(msg.frame_id);
+    //Serial.println(msg.frame_data[0]);
+    //Serial.println(msg.frame_data[1]);
+    //Serial.println(msg.frame_data[2]);
+    //Serial.println(msg.frame_data[3]);
+    //Serial.println(msg.frame_data[4]);
+    //Serial.println(msg.frame_data[5]);
+    //Serial.println(msg.frame_data[6]);
+    //Serial.println(msg.frame_data[7]);
+    if(msg.frame_data[1] == 0x62)
+    {
+      if(msg.frame_data[2] == 0xDA && msg.frame_data[3] == 0x85) //Air to Fuel
+      {
+        afr = ((msg.frame_data[4] *23)/20);
+        afrWhole = afr/10;
+        afrRemainder = (afr % 10); 
+
+      }
+      else if(msg.frame_data[2] == 0x03 && msg.frame_data[3] == 0xCA) //Boost air temps
+      {
+        bat = ((msg.frame_data[4] * 0x09)/0x05)-0x26;
+      }
+      else if(msg.frame_data[2] == 0x03 && msg.frame_data[3] == 0xEC) //Knock retard degrees
+      {
+        krd = ((msg.frame_data[4]*256)+msg.frame_data[5])/5;
+        krdWhole = krd / 100;
+        krdRemainder = krd % 100;  
+      }
+      else if(msg.frame_data[2] == 0xF4 && msg.frame_data[3] == 0x23) //FP in PSI 
+      {
+        fp = ((((msg.frame_data[4]*256)+msg.frame_data[5])*0x1D) / 0x14);  
+      }
+    }
+    else if(msg.frame_data[1] == 0x41)
+    {
+      if(msg.frame_data[2] == 0x0B) //Boost
+      {
+        boost = ((msg.frame_data[3] * 0x91)/0x64)-0x91;
+        boostWhole = boost/10;
+        boostRemainder = abs((boost % 10)); 
+      } 
+    }   
   }
-  */
-  
-  if( msg.frame_id == 0x200 ){
-    sprintf(lcdString, "            ");
-    // sprintf(lcdString, "AFR: %d %d", msg.frame_data[2], msg.frame_data[3] );
-    
-    // afr = ((((msg.frame_data[2]-38)*256)+msg.frame_data[3])-0)/16;
-    afr = (((msg.frame_data[2]-38)*256) +msg.frame_data[3])*62.5;
-    afrWhole = afr/1000;
-    afrRemainder = (afr % 1000)/100;
-    
-  }
-  
-  if( msg.frame_id == 0x7E8 /* && msg.frame_id[]*/ ){
-    knockRetard = (msg.frame_data[3]*7)/2;
-  }
-  
-  if( msg.frame_id == 0x7E8 && msg.frame_data[2] == 0x3C ){
-    egt = (( msg.frame_data[3] *256)+ msg.frame_data[4] )/10 - 40;
-  }
-  
-  if( msg.frame_id == 0x7E8 && msg.frame_data[2] == 0x11 && msg.frame_data[3] == 0x6B ){
-    sparkAdvance = (msg.frame_data[5]*0x0A)/4;
-    // sparkAdvance = msg.frame_data[5];
-  }
-  
-  if( msg.frame_id == 0x73F && msg.frame_data[2] == 0x59 && msg.frame_data[3] == 0x6A ){
-    pWeight = (((msg.frame_data[4]*256) + msg.frame_data[5]) * 0xB)/0x64 ;
-  }
-  
   // sprintf(lcdString, "A:%d.%d K:%d", afrWhole, afrRemainder, knockRetard );
-  sprintf(lcdString, "A:%d.%d E:%d", afrWhole, afrRemainder, egt );
+  switch(MazdaLED::gaugePage)
+  {
+    case 0:
+      sprintf(lcdString, "B%3d.%d A%2d.%d", boostWhole, boostRemainder, afrWhole, afrRemainder );
+      break;
+    case 1:
+      sprintf(lcdString, "F%4d B%3d", fp, bat );
+      break;
+    case 2:
+      sprintf(lcdString, "KR %2d.%d", krdWhole, krdRemainder );
+      break;
+  }
+  
   // sprintf(lcdString, "A:%d.%d K:%d", afrWhole, afrRemainder, sparkAdvance );
   // sprintf(lcdString, "A:%d.%d W:%d", afrWhole, afrRemainder, pWeight );
-  
-  
+
+
+  // Turn off extras like decimal point. Needs verification!
+  if( msg.frame_id == 0x201 ){
+    msg.dispatch = false;
+  }
+
+
   // Animation
   // strcpy( MazdaLED::lcdString, "CANBusTriple" );
   // animationCounter++;
-  
-   
+
+
   return msg;
 }
+
+
 
 
 
