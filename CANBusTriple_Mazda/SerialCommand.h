@@ -60,8 +60,8 @@ byte SerialCommand::logOutputMode = 0x0;
 unsigned int SerialCommand::logOutputFilter = 0;
 QueueArray<Message> *SerialCommand::mainQueue;
 //CANBus SerialCommand::busses[3];
-//byte SerialCommand::busEnabled = 0x7; // Start with all busses enabled
-byte SerialCommand::busEnabled = 0x2; // Start with all busses enabled
+byte SerialCommand::busEnabled = 0x7; // Start with all busses enabled
+//byte SerialCommand::busEnabled = 0x2; // Start with all busses enabled
 
 
 void SerialCommand::init( QueueArray<Message> *q, CANBus b[], int logOutput )

@@ -83,13 +83,21 @@ void MazdaLED::tick()
   // if( (millis() % 100) < 1 ) MazdaLED::knockServiceCall();
   //if( (millis() % 100) < 1 ) MazdaLED::egtServiceCall();
   // if( (millis() % 100) < 1 ) MazdaLED::advanceServiceCall();
-
-  if( (millis() % 100) < 1 ) MazdaLED::knockServiceCall();  
-  if( (millis() % 203) < 1 ) MazdaLED::afrServiceCall();
-  if( (millis() % 206) < 1 ) MazdaLED::boostServiceCall();
-  if( (millis() % 503) < 1 ) MazdaLED::batServiceCall();
-  if( (millis() % 209) < 1 ) MazdaLED::fpServiceCall();
-
+  
+  if(gaugePage == 0)
+  {
+    if( (millis() % 203) < 1 ) MazdaLED::afrServiceCall();
+    if( (millis() % 206) < 1 ) MazdaLED::boostServiceCall();  
+  }
+  else if(gaugePage == 1)
+  {
+    if( (millis() % 503) < 1 ) MazdaLED::batServiceCall();
+    if( (millis() % 209) < 1 ) MazdaLED::fpServiceCall();    
+  }
+  else
+  {
+    if( (millis() % 100) < 1 ) MazdaLED::knockServiceCall();  
+  }
 
 }
 
@@ -411,15 +419,6 @@ Message MazdaLED::process(Message msg)
 
   if(msg.frame_id == 0x7E8 || msg.frame_id == 0x7E0)
   {
-    //Serial.println(msg.frame_id);
-    //Serial.println(msg.frame_data[0]);
-    //Serial.println(msg.frame_data[1]);
-    //Serial.println(msg.frame_data[2]);
-    //Serial.println(msg.frame_data[3]);
-    //Serial.println(msg.frame_data[4]);
-    //Serial.println(msg.frame_data[5]);
-    //Serial.println(msg.frame_data[6]);
-    //Serial.println(msg.frame_data[7]);
     if(msg.frame_data[1] == 0x62)
     {
       if(msg.frame_data[2] == 0xDA && msg.frame_data[3] == 0x85) //Air to Fuel
